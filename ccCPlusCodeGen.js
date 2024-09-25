@@ -58,6 +58,32 @@ function parseTemplate(lines) {
     return arrGroup;
 }
 
+
+function writeFile(path, content) {
+    fs.writeFileSync(path, content, 'utf-8');
+}
+
+
+
+function regexSplit(lines, stRegex, endRegex, startIdx, endIdx) {
+    let arr = [];
+    let ele = {};
+    for (let i = startIdx; i < endIdx; i++) {
+        let line = lines[i];
+        let m = null;
+        if (m = line.match(stRegex)) {
+            ele = { stName: m[0], stIdx: i };
+        } else if (m = line.match(endRegex)) {
+            ele = { ...ele, endName: m[0], endIdx: i };
+            if (ele.hasOwnProperty("stName")) {
+                arr.push(ele);
+            }
+        }
+    }
+
+    return arr;
+}
+
 // let operateType = 1;// 1: read, 2: addOrEdit, 3: delete, 4: writeRead
 async function onRun(operateType) {
     // 模板的每一个分组
@@ -75,7 +101,7 @@ async function onRun(operateType) {
     function writeMyFile() {
         if (strTargetFilePath && (edit + insert + del) > 0) {
             // 写入文件
-            fs.writeFileSync(strTargetFilePath, arrTargetFileLines.join("\r\n"), 'utf-8');
+            writeFile(strTargetFilePath, arrTargetFileLines.join("\r\n")); 
             console.log(`写入${strTargetFilePath}  edit: ${edit}, insert: ${insert}, delete: ${del} `);
             edit = 0;
             insert = 0;
@@ -85,32 +111,27 @@ async function onRun(operateType) {
     function readMyFile() {
         // 写入文件 
         let content = readLines.map(gp => gp.join("\r\n")).join("\r\n\r\n");
-
-        fs.writeFileSync(readFile, content, 'utf-8');
+ 
+        writeFile(readFile, content);
         console.log(`读取${readFile}  read: ${read}`);
         read = 0;
     }
 
 
-    function regexSplit(lines, stRegex, endRegex, startIdx, endIdx) {
-        let arr = [];
-        let ele = {};
-        for (let i = startIdx; i < endIdx; i++) {
-            let line = lines[i];
-            let m = null;
-            if (m = line.match(stRegex)) {
-                ele = { stName: m[0], stIdx: i };
-            } else if (m = line.match(endRegex)) {
-                ele = { ...ele, endName: m[0], endIdx: i };
-                if (ele.hasOwnProperty("stName")) {
-                    arr.push(ele);
-                }
+    function getIds(file) {
+        let id_set = new Set();
+        let fPath = removeSlash(file)
+        let fContent = fs.readFileSync(fPath, 'utf-8');
+        const fLines = fContent.split(/\r?\n/);
+        let regex = /ccgen_([a-zA-Z0-9]+)_([a-zA-Z0-9]+)_begin/;
+        fLines.forEach(line => {
+            let m = line.match(regex);
+            if (m && m.length == 3) {
+                id_set.add(m[1]);
             }
-        }
-
-        return arr;
+        })
+        return id_set;
     }
-
 
 
     async function deleteComponent(fPath, cmpId) {
@@ -162,23 +183,10 @@ async function onRun(operateType) {
                 res.push(fLines[i]);
             }
         }
-        fs.writeFileSync(fPath, res.join("\r\n"), 'utf-8');
+        writeFile(fPath, res.join("\r\n")); 
     }
 
-    function getIds(file) {
-        let id_set = new Set();
-        let fPath = removeSlash(file)
-        let fContent = fs.readFileSync(fPath, 'utf-8');
-        const fLines = fContent.split(/\r?\n/);
-        let regex = /ccgen_([a-zA-Z0-9]+)_([a-zA-Z0-9]+)_begin/;
-        fLines.forEach(line => {
-            let m = line.match(regex);
-            if (m && m.length == 3) {
-                id_set.add(m[1]);
-            }
-        })
-        return id_set;
-    }
+
 
     async function ccGen() {
         // #region 获取模板分组
